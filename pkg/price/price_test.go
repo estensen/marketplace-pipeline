@@ -161,6 +161,80 @@ func TestGetHistoricalPrice(t *testing.T) {
 	}
 }
 
+func TestGetHistoricalPrices(t *testing.T) {
+	tests := []struct {
+		name           string
+		symbols        []string
+		mockResponses  map[string]string
+		expectedErr    bool
+		expectedPrices map[string]float64
+	}{
+		{
+			name:    "multiple valid responses",
+			symbols: []string{"SFL", "ETH"},
+			mockResponses: map[string]string{
+				"SFL": `{"market_data": {"current_price": {"usd": 123.45}}}`,
+				"ETH": `{"market_data": {"current_price": {"usd": 2345.67}}}`,
+			},
+			expectedErr:    false,
+			expectedPrices: map[string]float64{"SFL": 123.45, "ETH": 2345.67},
+		},
+		{
+			name:    "one valid one invalid",
+			symbols: []string{"SFL", "ETH"},
+			mockResponses: map[string]string{
+				"SFL": `{"market_data": {"current_price": {"usd": 123.45}}}`,
+				"ETH": ``,
+			},
+			expectedErr:    true,
+			expectedPrices: map[string]float64{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Extract the symbol from the URL to decide which mock response to return
+				t.Logf("Request URL: %s", r.URL.String())
+				if strings.Contains(r.URL.String(), "SFL") {
+					t.Logf("Returning mock response for SFL")
+					w.Write([]byte(tc.mockResponses["SFL"]))
+				} else if strings.Contains(r.URL.String(), "ETH") {
+					t.Logf("Returning mock response for ETH")
+					w.Write([]byte(tc.mockResponses["ETH"]))
+				}
+			}))
+			defer mockServer.Close()
+
+			// Create a new CoinGeckoAPI with a custom fetchFunc to use the mock server
+			api := &CoinGeckoAPI{
+				fetchFunc: func(url string) (*http.Response, error) {
+					// Append the actual token symbol to the mock server URL
+					mockURL := mockServer.URL + url[strings.Index(url, "/coins"):]
+					return http.Get(mockURL)
+				},
+			}
+
+			// Call GetHistoricalPrices with the test case symbols
+			prices, err := api.GetHistoricalPrices(tc.symbols, time.Now())
+
+			if tc.expectedErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+
+			// Assert the prices match the expected values
+			for symbol, expectedPrice := range tc.expectedPrices {
+				actualPrice, ok := prices[symbol]
+				require.True(t, ok, "price for symbol %s not found", symbol)
+				assert.Equal(t, expectedPrice, actualPrice, "price for symbol %s did not match", symbol)
+			}
+		})
+	}
+}
+
 func TestFetchResponse(t *testing.T) {
 	tests := []struct {
 		name        string

@@ -18,6 +18,7 @@ var (
 // PriceAPI is an interface for fetching historical price data.
 type PriceAPI interface {
 	GetHistoricalPrice(symbol string, date time.Time) (float64, error)
+	GetHistoricalPrices(symbols []string, date time.Time) (map[string]float64, error)
 }
 
 // CoinGeckoAPI implements the PriceAPI interface using the CoinGecko API.
@@ -48,6 +49,19 @@ func (c *CoinGeckoAPI) GetHistoricalPrice(symbol string, date time.Time) (float6
 	}
 
 	return price, nil
+}
+
+// GetHistoricalPrices fetches the historical prices of multiple tokens for a given date.
+func (c *CoinGeckoAPI) GetHistoricalPrices(symbols []string, date time.Time) (map[string]float64, error) {
+	prices := make(map[string]float64)
+	for _, symbol := range symbols {
+		price, err := c.GetHistoricalPrice(symbol, date)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching price for token %s: %v", symbol, err)
+		}
+		prices[symbol] = price
+	}
+	return prices, nil
 }
 
 // buildCoinGeckoURL constructs the CoinGecko API URL for fetching historical price data.
