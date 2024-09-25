@@ -2,6 +2,7 @@ package aggregator
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -19,10 +20,13 @@ type Aggregator interface {
 
 type SimpleAggregator struct{}
 
+// NewAggregator creates a new instance of SimpleAggregator.
 func NewAggregator() *SimpleAggregator {
 	return &SimpleAggregator{}
 }
 
+// Aggregate processes transactions, applying token prices to
+// calculate aggregated data for each project.
 func (a *SimpleAggregator) Aggregate(transactions []models.Transaction, prices map[string]float64) ([]models.AggregatedData, error) {
 	dataMap := make(map[string]*models.AggregatedData)
 
@@ -30,56 +34,70 @@ func (a *SimpleAggregator) Aggregate(transactions []models.Transaction, prices m
 		date := txn.Timestamp.Truncate(24 * time.Hour)
 		key := date.Format("2006-01-02") + txn.ProjectID
 
-		// Convert currency value to float
-		currencyValue, err := strconv.ParseFloat(txn.Nums.CurrencyValueDecimal, 64)
+		currencyValue, err := a.parseCurrencyValue(txn.Nums.CurrencyValueDecimal)
 		if err != nil {
 			log.Printf("Error parsing currency value: %v", err)
-			// Skip when unable to parse
 			continue
 		}
 
-		// Convert from wei to the token's unit (assuming 18 decimals for Ethereum-based tokens)
-		currencyValue = currencyValue / 1e18
-
-		// Attempt to get USD price for the token
-		priceUSD, found := prices[txn.Props.CurrencySymbol]
-		if !found {
-			// Attempt to normalize the symbol and retry
-			normalizedSymbol := normalizeSymbol(txn.Props.CurrencySymbol)
-			priceUSD, found = prices[normalizedSymbol]
-			if !found {
-				log.Printf("Price not found for currency symbol: %s (normalized: %s)", txn.Props.CurrencySymbol, normalizedSymbol)
-				// If price still not found, skip this transaction
-				continue
-			}
+		priceUSD, err := a.getPriceUSD(txn.Props.CurrencySymbol, prices)
+		if err != nil {
+			log.Printf("Price not found for currency symbol: %s", txn.Props.CurrencySymbol)
+			continue
 		}
 
-		// Only now create or update the aggregated data entry after validations
-		aggData, exists := dataMap[key]
-		if !exists {
-			aggData = &models.AggregatedData{
-				Date:             date,
-				ProjectID:        txn.ProjectID,
-				TransactionCount: 0,
-				TotalVolumeUSD:   0,
-			}
-			dataMap[key] = aggData
-		}
-
-		// Increment transaction count and calculate total volume in USD
-		aggData.TransactionCount++
-		aggData.TotalVolumeUSD += currencyValue * priceUSD
+		a.updateAggregatedData(dataMap, key, date, txn.ProjectID, currencyValue*priceUSD)
 	}
 
-	// Collect and return aggregated data
-	var aggregatedData []models.AggregatedData
+	return a.collectAggregatedData(dataMap), nil
+}
+
+// parseCurrencyValue converts a currency value from string to float, normalizing it from wei.
+func (a *SimpleAggregator) parseCurrencyValue(value string) (float64, error) {
+	currencyValue, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, err
+	}
+	return currencyValue / 1e18, nil
+}
+
+// getPriceUSD retrieves the USD price of a token, normalizing the symbol if necessary.
+func (a *SimpleAggregator) getPriceUSD(symbol string, prices map[string]float64) (float64, error) {
+	priceUSD, found := prices[symbol]
+	if !found {
+		priceUSD, found = prices[normalizeSymbol(symbol)]
+		if !found {
+			return 0, fmt.Errorf("price not found for symbol: %s", symbol)
+		}
+	}
+	return priceUSD, nil
+}
+
+// updateAggregatedData updates the transaction count and total volume for a specific project.
+func (a *SimpleAggregator) updateAggregatedData(dataMap map[string]*models.AggregatedData, key string, date time.Time, projectID string, totalVolumeUSD float64) {
+	if aggData, exists := dataMap[key]; exists {
+		aggData.TransactionCount++
+		aggData.TotalVolumeUSD += totalVolumeUSD
+	} else {
+		dataMap[key] = &models.AggregatedData{
+			Date:             date,
+			ProjectID:        projectID,
+			TransactionCount: 1,
+			TotalVolumeUSD:   totalVolumeUSD,
+		}
+	}
+}
+
+// collectAggregatedData compiles the aggregated data into a slice.
+func (a *SimpleAggregator) collectAggregatedData(dataMap map[string]*models.AggregatedData) []models.AggregatedData {
+	aggregatedData := make([]models.AggregatedData, 0, len(dataMap))
 	for _, data := range dataMap {
 		aggregatedData = append(aggregatedData, *data)
 	}
-
-	return aggregatedData, nil
+	return aggregatedData
 }
 
+// normalizeSymbol normalizes a token symbol by converting it to uppercase and splitting on periods.
 func normalizeSymbol(symbol string) string {
 	return strings.ToUpper(strings.Split(symbol, ".")[0])
 }
