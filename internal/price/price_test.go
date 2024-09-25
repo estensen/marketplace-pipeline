@@ -14,49 +14,59 @@ import (
 )
 
 func TestFetchCoinsList(t *testing.T) {
-	// Mock response data for the CoinGecko API
-	mockResponse := `[{
-		"id":"bridged-matic-manta-pacific","symbol":"matic","name":"Bridged MATIC (Manta Pacific)"
-	},
-	{
-		"id": "matic-network", "symbol": "matic", "name": "Polygon"
-	},
-	{
-		"id": "usd-coin", "symbol": "usdc", "name": "USD Coin"
-	}, {
-		"id": "binancecoin", "symbol": "bnb", "name": "Binance Coin"
-	}, {
-		"id": "ethereum", "symbol": "eth", "name": "Ethereum"
-	}]`
-
-	// Mock HTTP function to return the response
-	mockFetchFunc := func(url string) (*http.Response, error) {
-		// Simulate the behavior of a successful HTTP response with mock data
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(mockResponse)),
-		}, nil
+	tests := []struct {
+		name          string
+		mockResponse  string
+		expectedCoins map[string]string
+		expectedErr   bool
+	}{
+		{
+			name: "Valid response",
+			mockResponse: `[{
+				"id":"bridged-matic-manta-pacific","symbol":"matic","name":"Bridged MATIC (Manta Pacific)"
+			},
+			{
+				"id": "matic-network", "symbol": "matic", "name": "Polygon"
+			},
+			{
+				"id": "usd-coin", "symbol": "usdc", "name": "USD Coin"
+			}]`,
+			expectedCoins: map[string]string{
+				"MATIC": "matic-network",
+				"USDC":  "usd-coin",
+			},
+			expectedErr: false,
+		},
+		{
+			name:         "Invalid JSON response",
+			mockResponse: `invalid json`,
+			expectedErr:  true,
+		},
 	}
 
-	// Create a new CoinGeckoAPI instance, injecting the mock function
-	api := &CoinGeckoAPI{
-		fetchFunc: mockFetchFunc,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(tt.mockResponse))
+			}))
+			defer mockServer.Close()
+
+			api := NewCoinGeckoAPI()
+			api.fetchFunc = func(url string) (*http.Response, error) {
+				return http.Get(mockServer.URL)
+			}
+
+			coins, err := api.FetchCoinsList()
+
+			if tt.expectedErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedCoins, coins)
+			}
+		})
 	}
-
-	// Call FetchCoinsList, which will now use the mocked fetchFunc
-	coinsList, err := api.FetchCoinsList()
-	require.NoError(t, err)
-
-	// Define the expected result
-	expected := map[string]string{
-		"MATIC": "matic-network",
-		"USDC":  "usd-coin",
-		"BNB":   "binancecoin",
-		"ETH":   "ethereum",
-	}
-
-	// Verify that the coinsList matches the expected result
-	assert.Equal(t, expected, coinsList)
 }
 
 func TestBuildCoinGeckoURL(t *testing.T) {

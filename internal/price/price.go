@@ -51,29 +51,40 @@ func (c *CoinGeckoAPI) FetchCoinsList() (map[string]string, error) {
 	}
 	defer resp.Body.Close()
 
+	coins, err := decodeCoinsList(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapCoinsList(coins), nil
+}
+
+// decodeCoinsList decodes the CoinGecko response into a list of CoinInfo.
+func decodeCoinsList(resp *http.Response) ([]CoinInfo, error) {
 	var coins []CoinInfo
 	if err := json.NewDecoder(resp.Body).Decode(&coins); err != nil {
 		return nil, fmt.Errorf("error decoding coins list: %v", err)
 	}
+	return coins, nil
+}
 
-	// Create a map of symbol to CoinGecko ID, ensuring case insensitivity
+// mapCoinsList maps a list of CoinInfo to a map of symbol to CoinGecko ID.
+func mapCoinsList(coins []CoinInfo) map[string]string {
 	symbolToIDMap := make(map[string]string)
 	for _, coin := range coins {
-		// Ensure we are case insensitive by converting to upper case
 		symbol := strings.ToUpper(coin.Symbol)
 
 		// Prioritize canonical symbols like "matic-network"
+		// Hardcoded work-around
 		if symbol == "MATIC" && coin.ID != "matic-network" {
 			continue
 		}
 
-		// Only map the symbol if it hasn't been mapped already
 		if _, exists := symbolToIDMap[symbol]; !exists {
 			symbolToIDMap[symbol] = coin.ID
 		}
 	}
-
-	return symbolToIDMap, nil
+	return symbolToIDMap
 }
 
 // GetHistoricalPrice fetches the historical price of a cryptocurrency for a given date.
