@@ -17,6 +17,7 @@ import (
 	"github.com/estensen/marketplace-pipeline/internal/parser"
 	"github.com/estensen/marketplace-pipeline/internal/price"
 	"github.com/estensen/marketplace-pipeline/internal/storage"
+	"github.com/estensen/marketplace-pipeline/internal/token"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -32,36 +33,12 @@ func main() {
 		log.Fatalf("Error parsing date: %v", err)
 	}
 
-	// Connect to ClickHouse
-	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{"127.0.0.1:9000"},
-		Auth: clickhouse.Auth{
-			Database: "default",
-		},
-	})
-	if err != nil {
-		log.Fatalf("Error connecting to ClickHouse: %v", err)
-	}
+	// Set up ClickHouse connection
+	conn := setupClickhouseConnection(ctx)
 	defer conn.Close()
 
-	// Verify connection
-	if err := conn.Ping(ctx); err != nil {
-		log.Fatalf("ClickHouse ping failed: %v", err)
-	}
-	log.Println("Successfully connected to ClickHouse.")
-
-	// Initialize MinIO Storage
-	minioEndpoint := "localhost:9001"
-	minioAccessKey := "minioadmin" // Default access key
-	minioSecretKey := "minioadmin" // Default secret key
-	minioBucket := "currency-data"
-	minioUseSSL := false
-
-	minioStorage, err := storage.NewMinIOStorage(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioUseSSL)
-	if err != nil {
-		log.Fatalf("Failed to initialize MinIO storage: %v", err)
-	}
-	log.Println("Initialized MinIO storage.")
+	// Initialize MinIO storage
+	minioStorage := setupMinIOStorage()
 
 	// Initialize CoinGecko API
 	coinAPI := price.NewCoinGeckoAPI()
@@ -84,16 +61,13 @@ func main() {
 
 	// Map tokens to CoinGecko IDs
 	coinIDs := []string{}
-	for _, token := range tokens {
-		if token == "USDC.E" {
-			token = "USDC"
-		}
-
-		uppercaseToken := strings.ToUpper(token)
-		if coinID, found := symbolToIDMap[uppercaseToken]; found {
+	for _, t := range tokens {
+		// Normalize token using the new token package
+		normalizedToken := token.NormalizeTokenSymbol(strings.ToUpper(t))
+		if coinID, found := symbolToIDMap[normalizedToken]; found {
 			coinIDs = append(coinIDs, coinID)
 		} else {
-			log.Printf("No CoinGecko ID found for token: %s", token)
+			log.Printf("No CoinGecko ID found for token: %s", t)
 		}
 	}
 
@@ -159,6 +133,42 @@ func main() {
 
 	// Keep the main function running
 	select {}
+}
+
+// setupClickhouseConnection initializes and returns a ClickHouse connection.
+func setupClickhouseConnection(ctx context.Context) clickhouse.Conn {
+	conn, err := clickhouse.Open(&clickhouse.Options{
+		Addr: []string{"127.0.0.1:9000"},
+		Auth: clickhouse.Auth{
+			Database: "default",
+		},
+	})
+	if err != nil {
+		log.Fatalf("Error connecting to ClickHouse: %v", err)
+	}
+
+	if err := conn.Ping(ctx); err != nil {
+		log.Fatalf("ClickHouse ping failed: %v", err)
+	}
+
+	log.Println("Successfully connected to ClickHouse.")
+	return conn
+}
+
+// setupMinIOStorage initializes and returns MinIO storage.
+func setupMinIOStorage() *storage.MinIOStorage {
+	endpoint := "localhost:9001"
+	accessKey := "minioadmin"
+	secretKey := "minioadmin"
+	bucket := "currency-data"
+	useSSL := false
+
+	storage, err := storage.NewMinIOStorage(endpoint, accessKey, secretKey, bucket, useSSL)
+	if err != nil {
+		log.Fatalf("Failed to initialize MinIO storage: %v", err)
+	}
+	log.Println("Initialized MinIO storage.")
+	return storage
 }
 
 func fetchPrices(ctx context.Context, conn clickhouse.Conn, coinIDs []string, date time.Time) (map[string]float64, error) {
