@@ -13,6 +13,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFetchCoinsList(t *testing.T) {
+	// Mock response data for the CoinGecko API
+	mockResponse := `[{
+		"id":"bridged-matic-manta-pacific","symbol":"matic","name":"Bridged MATIC (Manta Pacific)"
+	},
+	{
+		"id": "matic-network", "symbol": "matic", "name": "Polygon"
+	},
+	{
+		"id": "usd-coin", "symbol": "usdc", "name": "USD Coin"
+	}, {
+		"id": "binancecoin", "symbol": "bnb", "name": "Binance Coin"
+	}, {
+		"id": "ethereum", "symbol": "eth", "name": "Ethereum"
+	}]`
+
+	// Mock HTTP function to return the response
+	mockFetchFunc := func(url string) (*http.Response, error) {
+		// Simulate the behavior of a successful HTTP response with mock data
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(mockResponse)),
+		}, nil
+	}
+
+	// Create a new CoinGeckoAPI instance, injecting the mock function
+	api := &CoinGeckoAPI{
+		fetchFunc: mockFetchFunc,
+	}
+
+	// Call FetchCoinsList, which will now use the mocked fetchFunc
+	coinsList, err := api.FetchCoinsList()
+	require.NoError(t, err)
+
+	// Define the expected result
+	expected := map[string]string{
+		"MATIC": "matic-network",
+		"USDC":  "usd-coin",
+		"BNB":   "binancecoin",
+		"ETH":   "ethereum",
+	}
+
+	// Verify that the coinsList matches the expected result
+	assert.Equal(t, expected, coinsList)
+}
+
 func TestBuildCoinGeckoURL(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -110,36 +156,42 @@ func TestGetHistoricalPrice(t *testing.T) {
 		mockResponse  string
 		expectedPrice float64
 		expectedErr   bool
+		statusCode    int
 	}{
 		{
 			name: "valid response",
 			mockResponse: `{
 				"market_data": {
 					"current_price": {
-						"usd": 123.45
+						"usd": 45000.34
 					}
 				}
 			}`,
-			expectedPrice: 123.45,
+			expectedPrice: 45000.34,
 			expectedErr:   false,
+			statusCode:    http.StatusOK,
 		},
 		{
-			name:          "error response",
-			mockResponse:  "",
-			expectedPrice: 0.0,
+			name:          "404 error",
+			mockResponse:  ``,
+			expectedPrice: 0,
 			expectedErr:   true,
+			statusCode:    http.StatusNotFound,
+		},
+		{
+			name:          "invalid JSON",
+			mockResponse:  `{invalid json}`,
+			expectedPrice: 0,
+			expectedErr:   true,
+			statusCode:    http.StatusOK,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if tc.mockResponse != "" {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(tc.mockResponse))
-				} else {
-					w.WriteHeader(http.StatusInternalServerError)
-				}
+				w.WriteHeader(tc.statusCode)
+				w.Write([]byte(tc.mockResponse))
 			}))
 			defer mockServer.Close()
 
@@ -149,10 +201,11 @@ func TestGetHistoricalPrice(t *testing.T) {
 				},
 			}
 
-			price, err := api.GetHistoricalPrice("SFL", time.Now())
+			price, err := api.GetHistoricalPrice("BTC", time.Now())
+
 			if tc.expectedErr {
 				assert.Error(t, err)
-				assert.Equal(t, tc.expectedPrice, price)
+				assert.Equal(t, 0.0, price)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedPrice, price)
