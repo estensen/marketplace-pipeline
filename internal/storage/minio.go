@@ -10,9 +10,30 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+// Storage is an interface for uploading files.
+type Storage interface {
+	UploadFile(objectName string, reader io.Reader) error
+}
+
 type MinIOStorage struct {
 	Client     *minio.Client
 	BucketName string
+}
+
+// SetupMinIOStorage initializes and returns MinIO storage.
+func SetupMinIOStorage() *MinIOStorage {
+	endpoint := "localhost:9001"
+	accessKey := "minioadmin"
+	secretKey := "minioadmin"
+	bucket := "currency-data"
+	useSSL := false
+
+	storage, err := NewMinIOStorage(endpoint, accessKey, secretKey, bucket, useSSL)
+	if err != nil {
+		log.Fatalf("Failed to initialize MinIO storage: %v", err)
+	}
+	log.Println("Initialized MinIO storage.")
+	return storage
 }
 
 // NewMinIOStorage initializes and returns a new MinIOStorage instance.
