@@ -26,6 +26,25 @@ Marketplace Analytics for 2024-04-02:
 | 2024-04-02 | 4974       | 97                | 3.69             |
 +------------+------------+-------------------+------------------+
 
-$ curl "http://localhost:8080/metrics?date=2024-04-02"
-[{"Date":"2024-04-02T00:00:00Z","ProjectID":"0","TransactionCount":104,"TotalVolumeUSD":38.90877259486244},{"Date":"2024-04-02T00:00:00Z","ProjectID":"4974","TransactionCount":97,"TotalVolumeUSD":3.686094245830159},{"Date":"2024-04-02T00:00:00Z","ProjectID":"1609","TransactionCount":9,"TotalVolumeUSD":21.13694068638653}]
+$ curl "http://localhost:8080/metrics?date=2024-04-02" | jq
+[
+  {
+    "Date": "2024-04-02T00:00:00Z",
+    "ProjectID": "0",
+    "TransactionCount": 104,
+    "TotalVolumeUSD": 38.90877259486244
+  },
+  {
+    "Date": "2024-04-02T00:00:00Z",
+    "ProjectID": "4974",
+    "TransactionCount": 97,
+    "TotalVolumeUSD": 3.686094245830159
+  },
+  {
+    "Date": "2024-04-02T00:00:00Z",
+    "ProjectID": "1609",
+    "TransactionCount": 9,
+    "TotalVolumeUSD": 21.13694068638653
+  }
+]
 ```
