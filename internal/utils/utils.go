@@ -56,7 +56,8 @@ func DisplayMetrics(metrics []models.AggregatedData) {
 	t.Render()
 }
 
-// NormalizeTokenSymbol normalizes token symbols by removing extensions like ".E".
+// NormalizeTokenSymbol normalizes token symbols by converting them to their canonical forms.
+// For example, "USDC.E" is normalized to "USDC".
 func NormalizeTokenSymbol(symbol string) string {
-	return strings.Split(symbol, ".")[0]
+	return strings.ToUpper(strings.Split(symbol, ".")[0])
 }
