@@ -1,4 +1,4 @@
-package batch
+package database
 
 import (
 	"bytes"
@@ -12,12 +12,14 @@ import (
 	"github.com/estensen/marketplace-pipeline/internal/storage"
 )
 
+// BatchJob represents a job to fetch and store token prices.
 type BatchJob struct {
 	CoinAPI price.CoinAPI
 	Conn    clickhouse.Conn
 	Storage storage.Storage
 }
 
+// NewBatchJob creates a new BatchJob.
 func NewBatchJob(coinAPI price.CoinAPI, conn clickhouse.Conn, storage storage.Storage) *BatchJob {
 	return &BatchJob{
 		CoinAPI: coinAPI,
@@ -26,6 +28,7 @@ func NewBatchJob(coinAPI price.CoinAPI, conn clickhouse.Conn, storage storage.St
 	}
 }
 
+// RunDailyBatchJob fetches prices and stores them in ClickHouse and MinIO.
 func (b *BatchJob) RunDailyBatchJob(ctx context.Context, coinIDs []string, date time.Time) error {
 	// Check if prices for the given date already exist in ClickHouse
 	var count uint64
@@ -72,6 +75,7 @@ func (b *BatchJob) RunDailyBatchJob(ctx context.Context, coinIDs []string, date 
 	return nil
 }
 
+// StorePricesInMinIO saves the token prices to MinIO in CSV format.
 func (b *BatchJob) StorePricesInMinIO(prices map[string]float64, date time.Time) error {
 	// Create a CSV in memory
 	var buf bytes.Buffer
@@ -84,7 +88,7 @@ func (b *BatchJob) StorePricesInMinIO(prices map[string]float64, date time.Time)
 
 	// Write the price records
 	for token, price := range prices {
-		record := []string{token, fmt.Sprintf("%.2f", price)}
+		record := []string{token, fmt.Sprintf("%.8f", price)}
 		if err := writer.Write(record); err != nil {
 			return fmt.Errorf("error writing CSV record: %w", err)
 		}

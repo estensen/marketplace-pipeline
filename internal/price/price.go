@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Predefined errors for better error handling.
 var (
 	ErrHTTPResponse      = errors.New("error in HTTP response")
 	ErrInvalidResponse   = errors.New("invalid CoinGecko response")
@@ -17,7 +18,7 @@ var (
 	ErrMissingUSDPrice   = errors.New("missing USD price in CoinGecko response")
 )
 
-// CoinAPI is an interface for fetching historical price data.
+// CoinAPI defines the interface for fetching historical price data.
 type CoinAPI interface {
 	GetHistoricalPrice(coinID string, date time.Time) (float64, error)
 	GetHistoricalPrices(coinIDs []string, date time.Time) (map[string]float64, error)
@@ -29,21 +30,21 @@ type CoinGeckoAPI struct {
 	fetchFunc func(url string) (*http.Response, error)
 }
 
+// NewCoinGeckoAPI creates a new instance of CoinGeckoAPI.
 func NewCoinGeckoAPI() *CoinGeckoAPI {
 	return &CoinGeckoAPI{
 		fetchFunc: fetchResponse,
 	}
 }
 
-// CoinInfo holds the information of a coin from CoinGecko
+// CoinInfo represents the structure of a coin's information from CoinGecko.
 type CoinInfo struct {
 	ID     string `json:"id"`
 	Symbol string `json:"symbol"`
 	Name   string `json:"name"`
 }
 
-// FetchCoinsList fetches the list of all coins from CoinGecko
-// and returns a map of symbol to CoinGecko IDs.
+// FetchCoinsList retrieves the list of all coins from CoinGecko and maps symbols to their IDs.
 func (c *CoinGeckoAPI) FetchCoinsList() (map[string]string, error) {
 	resp, err := c.fetchFunc("https://api.coingecko.com/api/v3/coins/list")
 	if err != nil {
@@ -59,7 +60,7 @@ func (c *CoinGeckoAPI) FetchCoinsList() (map[string]string, error) {
 	return mapCoinsList(coins), nil
 }
 
-// decodeCoinsList decodes the CoinGecko response into a list of CoinInfo.
+// decodeCoinsList decodes the CoinGecko response into a slice of CoinInfo.
 func decodeCoinsList(resp *http.Response) ([]CoinInfo, error) {
 	var coins []CoinInfo
 	if err := json.NewDecoder(resp.Body).Decode(&coins); err != nil {
@@ -68,14 +69,14 @@ func decodeCoinsList(resp *http.Response) ([]CoinInfo, error) {
 	return coins, nil
 }
 
-// mapCoinsList maps a list of CoinInfo to a map of symbol to CoinGecko ID.
+// mapCoinsList maps a slice of CoinInfo to a map of symbol to CoinGecko ID.
+// Prioritizes canonical symbols like "MATIC".
 func mapCoinsList(coins []CoinInfo) map[string]string {
 	symbolToIDMap := make(map[string]string)
 	for _, coin := range coins {
 		symbol := strings.ToUpper(coin.Symbol)
 
-		// Prioritize canonical symbols like "matic-network"
-		// Hardcoded work-around
+		// Prioritize canonical symbols like "MATIC" with specific IDs
 		if symbol == "MATIC" && coin.ID != "matic-network" {
 			continue
 		}
@@ -87,7 +88,7 @@ func mapCoinsList(coins []CoinInfo) map[string]string {
 	return symbolToIDMap
 }
 
-// GetHistoricalPrice fetches the historical price of a cryptocurrency for a given date.
+// GetHistoricalPrice fetches the historical USD price of a cryptocurrency for a given date.
 func (c *CoinGeckoAPI) GetHistoricalPrice(coinID string, date time.Time) (float64, error) {
 	url := buildCoinGeckoURL(coinID, date)
 
@@ -110,7 +111,7 @@ func (c *CoinGeckoAPI) GetHistoricalPrice(coinID string, date time.Time) (float6
 	return price, nil
 }
 
-// GetHistoricalPrices fetches the historical prices of multiple cryptocurrencies for a given date.
+// GetHistoricalPrices fetches the historical USD prices of multiple cryptocurrencies for a given date.
 func (c *CoinGeckoAPI) GetHistoricalPrices(coinIDs []string, date time.Time) (map[string]float64, error) {
 	prices := make(map[string]float64)
 	for _, coinID := range coinIDs {
@@ -123,11 +124,13 @@ func (c *CoinGeckoAPI) GetHistoricalPrices(coinIDs []string, date time.Time) (ma
 	return prices, nil
 }
 
+// buildCoinGeckoURL constructs the API URL for fetching historical price data.
 func buildCoinGeckoURL(coinID string, date time.Time) string {
 	formattedDate := date.Format("02-01-2006")
 	return fmt.Sprintf("https://api.coingecko.com/api/v3/coins/%s/history?date=%s", coinID, formattedDate)
 }
 
+// fetchResponse performs an HTTP GET request and returns the response.
 func fetchResponse(url string) (*http.Response, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -141,6 +144,7 @@ func fetchResponse(url string) (*http.Response, error) {
 	return resp, nil
 }
 
+// parsePriceFromResponse extracts the USD price from the CoinGecko API response.
 func parsePriceFromResponse(resp *http.Response) (float64, error) {
 	if resp.Body == nil {
 		return 0, fmt.Errorf("%w: response body is empty", ErrInvalidResponse)
@@ -156,7 +160,6 @@ func parsePriceFromResponse(resp *http.Response) (float64, error) {
 	// Check if the "market_data" field is present
 	marketData, ok := result["market_data"].(map[string]interface{})
 	if !ok {
-		// Gracefully handle missing market data
 		log.Printf("Missing market data for token %s", result["id"])
 		return 0, fmt.Errorf("%w: market_data field not found", ErrMissingMarketData)
 	}

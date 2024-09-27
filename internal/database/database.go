@@ -29,6 +29,7 @@ func NewClickHouseConnection(ctx context.Context) clickhouse.Conn {
 	return conn
 }
 
+// FetchPrices retrieves token prices from ClickHouse for the given coin IDs and date.
 func FetchPrices(ctx context.Context, conn clickhouse.Conn, coinIDs []string, date time.Time) (map[string]float64, error) {
 	prices := make(map[string]float64)
 	query := "SELECT token, average_price_usd FROM token_prices WHERE token IN (?) AND date = ?"

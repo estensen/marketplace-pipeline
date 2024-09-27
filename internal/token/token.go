@@ -1,12 +1,14 @@
 package token
 
-// NormalizeTokenSymbol normalizes token symbols
-// like "USDC.E" to their canonical equivalents (e.g., "USDC").
+import "strings"
+
+// NormalizeTokenSymbol normalizes token symbols by converting them to their canonical forms.
+// For example, "USDC.E" is normalized to "USDC".
 func NormalizeTokenSymbol(symbol string) string {
 	switch symbol {
 	case "USDC.E":
 		return "USDC"
 	default:
-		return symbol
+		return strings.ToUpper(symbol)
 	}
 }

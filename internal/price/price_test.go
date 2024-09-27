@@ -72,13 +72,13 @@ func TestFetchCoinsList(t *testing.T) {
 func TestBuildCoinGeckoURL(t *testing.T) {
 	tests := []struct {
 		name        string
-		symbol      string
+		coinID      string
 		date        time.Time
 		expectedURL string
 	}{
 		{
-			name:        "valid url",
-			symbol:      "SFL",
+			name:        "Valid URL",
+			coinID:      "SFL",
 			date:        time.Date(2024, time.April, 15, 0, 0, 0, 0, time.UTC),
 			expectedURL: "https://api.coingecko.com/api/v3/coins/SFL/history?date=15-04-2024",
 		},
@@ -86,7 +86,7 @@ func TestBuildCoinGeckoURL(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			url := buildCoinGeckoURL(tc.symbol, tc.date)
+			url := buildCoinGeckoURL(tc.coinID, tc.date)
 			assert.Equal(t, tc.expectedURL, url)
 		})
 	}
@@ -100,33 +100,33 @@ func TestParsePriceFromResponse(t *testing.T) {
 		expectedPrice float64
 	}{
 		{
-			name:          "valid response",
+			name:          "Valid response",
 			mockResponse:  `{"market_data": {"current_price": {"usd": 123.45}}}`,
 			expectedErr:   nil,
 			expectedPrice: 123.45,
 		},
 		{
-			name:         "empty response body",
+			name:         "Empty response body",
 			mockResponse: "",
 			expectedErr:  ErrInvalidResponse,
 		},
 		{
-			name:         "malformed JSON",
+			name:         "Malformed JSON",
 			mockResponse: `{"market_data": { "current_price": {"usd": "123.45}`, // incomplete JSON
 			expectedErr:  ErrInvalidResponse,
 		},
 		{
-			name:         "missing market data",
+			name:         "Missing market data",
 			mockResponse: `{"something_else": {}}`,
 			expectedErr:  ErrMissingMarketData,
 		},
 		{
-			name:         "missing current_price",
+			name:         "Missing current_price",
 			mockResponse: `{"market_data": {"something_else": {}}}`,
 			expectedErr:  ErrMissingMarketData,
 		},
 		{
-			name:         "missing USD price",
+			name:         "Missing USD price",
 			mockResponse: `{"market_data": {"current_price": {"eur": 123.45}}}`,
 			expectedErr:  ErrMissingUSDPrice,
 		},
@@ -136,7 +136,7 @@ func TestParsePriceFromResponse(t *testing.T) {
 			expectedErr:  ErrMissingUSDPrice,
 		},
 		{
-			name:         "negative USD price",
+			name:         "Negative USD price",
 			mockResponse: `{"market_data": {"current_price": {"usd": -50.00}}}`,
 			expectedErr:  ErrMissingUSDPrice,
 		},
@@ -169,7 +169,7 @@ func TestGetHistoricalPrice(t *testing.T) {
 		statusCode    int
 	}{
 		{
-			name: "valid response",
+			name: "Valid response",
 			mockResponse: `{
 				"market_data": {
 					"current_price": {
@@ -189,7 +189,7 @@ func TestGetHistoricalPrice(t *testing.T) {
 			statusCode:    http.StatusNotFound,
 		},
 		{
-			name:          "invalid JSON",
+			name:          "Invalid JSON",
 			mockResponse:  `{invalid json}`,
 			expectedPrice: 0,
 			expectedErr:   true,
@@ -233,7 +233,7 @@ func TestGetHistoricalPrices(t *testing.T) {
 		expectedPrices map[string]float64
 	}{
 		{
-			name:    "multiple valid responses",
+			name:    "Multiple valid responses",
 			symbols: []string{"SFL", "ETH"},
 			mockResponses: map[string]string{
 				"SFL": `{"market_data": {"current_price": {"usd": 123.45}}}`,
@@ -243,7 +243,7 @@ func TestGetHistoricalPrices(t *testing.T) {
 			expectedPrices: map[string]float64{"SFL": 123.45, "ETH": 2345.67},
 		},
 		{
-			name:    "one valid one invalid",
+			name:    "One valid one invalid",
 			symbols: []string{"SFL", "ETH"},
 			mockResponses: map[string]string{
 				"SFL": `{"market_data": {"current_price": {"usd": 123.45}}}`,
@@ -258,37 +258,31 @@ func TestGetHistoricalPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Extract the symbol from the URL to decide which mock response to return
-				t.Logf("Request URL: %s", r.URL.String())
 				if strings.Contains(r.URL.String(), "SFL") {
-					t.Logf("Returning mock response for SFL")
 					w.Write([]byte(tc.mockResponses["SFL"]))
 				} else if strings.Contains(r.URL.String(), "ETH") {
-					t.Logf("Returning mock response for ETH")
 					w.Write([]byte(tc.mockResponses["ETH"]))
 				}
 			}))
 			defer mockServer.Close()
 
-			// Create a new CoinGeckoAPI with a custom fetchFunc to use the mock server
 			api := &CoinGeckoAPI{
 				fetchFunc: func(url string) (*http.Response, error) {
 					// Append the actual token symbol to the mock server URL
-					mockURL := mockServer.URL + url[strings.Index(url, "/coins"):]
-					return http.Get(mockURL)
+					return http.Get(mockServer.URL + url[strings.Index(url, "/coins"):])
 				},
 			}
 
-			// Call GetHistoricalPrices with the test case symbols
 			prices, err := api.GetHistoricalPrices(tc.symbols, time.Now())
 
 			if tc.expectedErr {
 				assert.Error(t, err)
+				assert.Empty(t, prices)
 				return
 			}
 
 			require.NoError(t, err)
 
-			// Assert the prices match the expected values
 			for symbol, expectedPrice := range tc.expectedPrices {
 				actualPrice, ok := prices[symbol]
 				require.True(t, ok, "price for symbol %s not found", symbol)

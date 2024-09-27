@@ -2,20 +2,20 @@ package utils
 
 import (
 	"fmt"
-
 	"os"
+	"strings"
+
+	"github.com/jedib0t/go-pretty/v6/table"
 
 	"github.com/estensen/marketplace-pipeline/internal/models"
-	"github.com/olekukonko/tablewriter"
 )
 
-// ExtractUniqueTokens extracts unique tokens from transactions
+// ExtractUniqueTokens extracts unique currency symbols from transactions.
 func ExtractUniqueTokens(transactions []models.Transaction) []string {
 	tokenSet := make(map[string]struct{})
 	for _, txn := range transactions {
 		tokenSet[txn.Props.CurrencySymbol] = struct{}{}
 	}
-
 	tokens := make([]string, 0, len(tokenSet))
 	for token := range tokenSet {
 		tokens = append(tokens, token)
@@ -23,40 +23,40 @@ func ExtractUniqueTokens(transactions []models.Transaction) []string {
 	return tokens
 }
 
-// InvertMap inverts a map[string]string to map[string]string
-func InvertMap(originalMap map[string]string) map[string]string {
-	invertedMap := make(map[string]string)
-	for key, value := range originalMap {
-		invertedMap[value] = key
+// InvertMap inverts a map of string to string.
+func InvertMap(m map[string]string) map[string]string {
+	inverted := make(map[string]string)
+	for key, value := range m {
+		inverted[value] = key
 	}
-	return invertedMap
+	return inverted
 }
 
-// DisplayMetrics displays aggregated metrics in a table format
+// DisplayMetrics prints aggregated metrics in a table format.
 func DisplayMetrics(metrics []models.AggregatedData) {
 	if len(metrics) == 0 {
-		fmt.Println("No data available for the specified date.")
+		fmt.Println("No metrics to display.")
 		return
 	}
 
 	fmt.Printf("Marketplace Analytics for %s:\n", metrics[0].Date.Format("2006-01-02"))
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Date", "Project ID", "Transaction Count", "Total Volume USD"})
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Date", "Project ID", "Transaction Count", "Total Volume USD"})
-	table.SetBorder(true)
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-
-	for _, metric := range metrics {
-		row := []string{
-			metric.Date.Format("2006-01-02"),
-			metric.ProjectID,
-			fmt.Sprintf("%d", metric.TransactionCount),
-			fmt.Sprintf("%.2f", metric.TotalVolumeUSD),
-		}
-		table.Append(row)
+	for _, data := range metrics {
+		t.AppendRow(table.Row{
+			data.Date.Format("2006-01-02"),
+			data.ProjectID,
+			data.TransactionCount,
+			fmt.Sprintf("%.2f", data.TotalVolumeUSD),
+		})
 	}
 
-	table.Render()
+	t.Render()
+}
+
+// NormalizeTokenSymbol normalizes token symbols by removing extensions like ".E".
+func NormalizeTokenSymbol(symbol string) string {
+	return strings.Split(symbol, ".")[0]
 }

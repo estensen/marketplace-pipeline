@@ -21,6 +21,14 @@ func TestNormalizeTokenSymbol(t *testing.T) {
 			symbol:     "SFL",
 			normalized: "SFL",
 		},
+		{
+			symbol:     "matic",
+			normalized: "MATIC",
+		},
+		{
+			symbol:     "usdc",
+			normalized: "USDC",
+		},
 	}
 
 	for _, tc := range tests {

@@ -60,3 +60,41 @@ func TestExtractUniqueTokens(t *testing.T) {
 
 	assert.ElementsMatch(t, expected, result, "ExtractUniqueTokens did not return expected unique tokens")
 }
+
+func TestInvertMap(t *testing.T) {
+	input := map[string]string{
+		"MATIC": "matic-network",
+		"USDC":  "usd-coin",
+	}
+
+	expected := map[string]string{
+		"matic-network": "MATIC",
+		"usd-coin":      "USDC",
+	}
+
+	result := InvertMap(input)
+
+	assert.Equal(t, expected, result, "InvertMap did not return the expected inverted map")
+}
+
+func TestDisplayMetrics(t *testing.T) {
+	metrics := []models.AggregatedData{
+		{
+			Date:             time.Date(2024, 4, 15, 0, 0, 0, 0, time.UTC),
+			ProjectID:        "137",
+			TransactionCount: 10,
+			TotalVolumeUSD:   1000.0,
+		},
+		{
+			Date:             time.Date(2024, 4, 2, 0, 0, 0, 0, time.UTC),
+			ProjectID:        "137",
+			TransactionCount: 5,
+			TotalVolumeUSD:   500.0,
+		},
+	}
+
+	// Since DisplayMetrics prints to stdout, we'll just ensure it runs without panic.
+	assert.NotPanics(t, func() {
+		DisplayMetrics(metrics)
+	}, "DisplayMetrics should not panic")
+}

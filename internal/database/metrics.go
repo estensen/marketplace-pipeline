@@ -1,4 +1,4 @@
-package metrics
+package database
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/estensen/marketplace-pipeline/internal/models"
 )
 
-// FetchMetrics retrieves aggregated metrics from ClickHouse for a given date.
+// FetchMetrics retrieves aggregated metrics from ClickHouse for the given date.
 func FetchMetrics(ctx context.Context, conn clickhouse.Conn, date time.Time) ([]models.AggregatedData, error) {
 	var metrics []models.AggregatedData
 	query := `

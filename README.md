@@ -2,9 +2,9 @@
 
 Pipeline for marketplace analytics.
 
-## Project Overview
+## Overview
 
-This project processes transaction data from a CSV file, fetches currency conversion rates from the CoinGecko API, calculates daily marketplace volume and transaction counts, and loads the data into ClickHouse for analytics. The entire pipeline is built using Go and can be run locally.
+Build a data pipeline that extracts transaction data from a CSV file, normalizes and aggregates the data, and stores the results in a ClickHouse database. The pipeline also fetches token prices from the CoinGecko API and provides an API endpoint for data visualization.
 
 ## Prerequisites
 
@@ -15,9 +15,7 @@ This project processes transaction data from a CSV file, fetches currency conver
 ### Run Pipeline Locally
 
 ```bash
-bash scripts/setup_clickhouse.sh
-bash scripts/setup_minio.sh
-go run cmd/main.go
+$ make all
 ...
 Marketplace Analytics for 2024-04-02:
 +------------+------------+-------------------+------------------+
@@ -27,4 +25,7 @@ Marketplace Analytics for 2024-04-02:
 | 2024-04-02 | 1609       | 9                 | 21.14            |
 | 2024-04-02 | 4974       | 97                | 3.69             |
 +------------+------------+-------------------+------------------+
+
+$ curl "http://localhost:8080/metrics?date=2024-04-02"
+[{"Date":"2024-04-02T00:00:00Z","ProjectID":"0","TransactionCount":104,"TotalVolumeUSD":38.90877259486244},{"Date":"2024-04-02T00:00:00Z","ProjectID":"4974","TransactionCount":97,"TotalVolumeUSD":3.686094245830159},{"Date":"2024-04-02T00:00:00Z","ProjectID":"1609","TransactionCount":9,"TotalVolumeUSD":21.13694068638653}]
 ```

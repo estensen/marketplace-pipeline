@@ -9,10 +9,12 @@ import (
 	"github.com/estensen/marketplace-pipeline/internal/models"
 )
 
+// Parser defines the interface for parsing CSV files.
 type Parser interface {
 	ParseCSV(filePath string) ([]models.Transaction, error)
 }
 
+// CSVParser implements the Parser interface for CSV files.
 type CSVParser struct{}
 
 // NewCSVParser creates a new instance of CSVParser.
@@ -39,7 +41,7 @@ func (p *CSVParser) ParseCSV(filePath string) ([]models.Transaction, error) {
 // readCSV reads the CSV content from a file and returns the records.
 func (p *CSVParser) readCSV(file *os.File) ([][]string, error) {
 	reader := csv.NewReader(file)
-	reader.FieldsPerRecord = -1 // Allow variable number of fields
+	reader.FieldsPerRecord = -1 // Allows variable number of fields per record
 	return reader.ReadAll()
 }
 

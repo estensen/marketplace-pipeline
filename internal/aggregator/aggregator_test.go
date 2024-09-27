@@ -51,11 +51,13 @@ func TestAggregate(t *testing.T) {
 			expected: []models.AggregatedData{
 				{
 					Date:             time.Date(2024, 4, 15, 0, 0, 0, 0, time.UTC),
+					ProjectID:        "137",
 					TransactionCount: 1,
-					TotalVolumeUSD:   (1.316777549196586) * 1.23,
+					TotalVolumeUSD:   1.316777549196586 * 1.23,
 				},
 				{
 					Date:             time.Date(2024, 4, 2, 0, 0, 0, 0, time.UTC),
+					ProjectID:        "137",
 					TransactionCount: 1,
 					TotalVolumeUSD:   0.7 * 0.408257,
 				},
@@ -130,6 +132,7 @@ func TestAggregate(t *testing.T) {
 			expected: []models.AggregatedData{
 				{
 					Date:             time.Date(2024, 4, 2, 0, 0, 0, 0, time.UTC),
+					ProjectID:        "137",
 					TransactionCount: 2,
 					TotalVolumeUSD:   (0.7 + 0.2) * 0.408257,
 				},
